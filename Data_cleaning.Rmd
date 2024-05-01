@@ -1,0 +1,96 @@
+---
+title: "Data cleaning"
+output: pdf_document
+date: "2024-04-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## load in datasets
+```{r}
+library("readxl")
+views_global <- read_excel("../all-weeks-global.xlsx")
+head(views_global)
+views_us <- read.csv("../all-weeks-us.csv")
+head(views_us)
+netflix <- read.csv("../netflix.csv")
+head(netflix)
+```
+## filter out genres
+```{r}
+library(dplyr)
+netflix_filtered <- select(netflix, c("title", "date_added", "listed_in"))
+head(netflix_filtered)
+genres <- unique(unlist(strsplit(netflix_filtered$listed_in, ", ")))
+genre_counts <- data.frame(genre=character(), true_count=integer(), false_count=integer())
+genres
+for (genre in genres) {
+  genre_col <- sapply(netflix_filtered$listed_in, function(x) genre %in% strsplit(x, ", ")[[1]])
+  netflix_filtered[paste("genre", genre, sep = "_")] <- genre_col
+  true_count <- sum(genre_col)
+  false_count <- nrow(netflix_filtered) - true_count
+  genre_counts <- rbind(genre_counts, data.frame(genre=genre, true_count=true_count, false_count=false_count))
+}
+genre_counts_filtered <- subset(genre_counts, true_count > 1000)
+netflix_filtered_by_genre <- select(netflix_filtered, c("title", "date_added", "genre_International TV Shows", "genre_Dramas", "genre_Comedies", "genre_International Movies"))
+netflix_filtered_by_genre$genre_International <- netflix_filtered_by_genre$`genre_International Movies` | netflix_filtered_by_genre$`genre_International TV Shows`
+sum(netflix_filtered_by_genre$genre_International)/nrow(netflix_filtered_by_genre)
+```
+
+
+## add in awards in global views dataframe
+```{r}
+views_global$awards <- FALSE
+award_titles <- c("BEEF", "Big Mouth", "DAHMER", 
+                  "Entergalactic", "Guillermo del Toro's Cabinet of Curiosities", "I Think You Should Leave With Tom Robinson", "John Mulaney: Baby J", "Queen Charlotte: A Bridgerton Story", "Queer Eye", "Wednesday", "Working: What We Do All Day", "Arcane", "Love, Death + Robots", "The House", "Arcane", "Bridgerton", "Love on the Spectrum U.S.", "Our Great National Parks", "Ozark", "Squid Game", "Stranger Things", "Bo Burnham: Inside", "Country Comfort", "David Attenborough: A Life on Our Planet", "Dick Johnson is Dead", "Dolly Parton's Christmas On the Square", "Halston", "The Crown", "The Queen's Gambit", "The Social Dilemma", "The Wonderful Story of Henry Sugar", "All Quiet on the Western Front", "Guillermo del Toro's Pinocchio", "The Elephant Whisperers", "The Power of the Dog", "If Anything Happens I Love You", "Ma Rainey's Black Bottom", "Mank", "My Octopus Teacher", "Two Distant Strangers", "The Harder They Fall", "His House", "Jimmy Savile: A British Horror Story", "The Tinder Swindler", "Top Boy", "The Witcher", "Fear City: New York vs The Mafia", "Sex Education: Season 2", "The Surgeon's Cut")
+views_global$awards[views_global$show_title %in% award_titles | views_global$season_title %in% award_titles] <- TRUE
+views_global
+```
+
+## join onto views_global
+```{r}
+library(tidyr)
+df_global <- left_join(views_global, netflix_filtered_by_genre, by =c('show_title'='title'))
+sum(is.na(df_global$genre_Comedies))/5880
+df_global_genres <- drop_na(df_global, genre_International) 
+df_global_genres <- select(df_global_genres, -c("episode_launch_details", "date_added"))
+# extract language
+df_global_genres$english <- TRUE
+df_global_genres$english[grepl("Non-English", df_global_genres$category)] <- FALSE
+# extract film/TV. true: TV false: film
+df_global_genres$tv <- TRUE
+df_global_genres$tv[grepl("Film", df_global_genres$category)] <- FALSE
+```
+
+## separate into film dataset and tv dataset, perform mice for runtime
+```{r}
+df_global_genres_tv <- subset(df_global_genres, tv==TRUE)
+df_global_genres_film <- subset(df_global_genres, tv==FALSE)
+# mice on tv
+library(mice)
+summary(df_global_genres_tv)
+md.pattern(df_global_genres_tv)
+# Assuming your data frame has 5 variables: runtime, weekly_hours_viewed, is_staggered_launch, genre_International TV, genre_Drama, and genre_Comedy
+
+# Create an empty matrix of zeroes
+predictorMatrix <- matrix(0, nrow = 6, ncol = 6, dimnames = list(c("runtime", "weekly_hours_viewed", "is_staggered_launch", "genre_International", "genre_Dramas", "genre_Comedies"), c("runtime", "weekly_hours_viewed", "is_staggered_launch", "genre_International", "genre_Dramas", "genre_Comedies")))
+
+# Set up predictors for runtime
+predictorMatrix["runtime", "weekly_hours_viewed"] <- 1
+predictorMatrix["runtime", "is_staggered_launch"] <- 1
+predictorMatrix["runtime", "genre_International"] <- 1
+predictorMatrix["runtime", "genre_Dramas"] <- 1
+predictorMatrix["runtime", "genre_Comedies"] <- 1
+
+imputed_data <- mice(df_global_genres_tv, method = "pmm", m=6, seed=123, predictorMatrix = predictorMatrix)
+mice_mod <- mice(df_global_genres_tv, m=5, method='pmm', seed=500)
+imputed_tv <- mice(df_global_genres_tv, method='pmm', seed=500)
+```
+## use mean value of runtime for film and tv instead
+```{r}
+
+```
+
+
