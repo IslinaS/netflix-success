@@ -67,14 +67,19 @@ df_global_genres$tv[grepl("Film", df_global_genres$category)] <- FALSE
 ## separate into film dataset and tv dataset, perform mice for runtime
 ```{r}
 df_global_genres_tv <- subset(df_global_genres, tv==TRUE)
+df_global_genres_tv <- select(df_global_genres_tv, -c("genre_International TV Shows", "genre_International Movies", "category", "tv"))
 df_global_genres_film <- subset(df_global_genres, tv==FALSE)
+df_global_genres_film <- select(df_global_genres_film, -c("genre_International TV Shows", "genre_International Movies", "category", "tv"))
 # mice on tv
 library(mice)
 summary(df_global_genres_tv)
 md.pattern(df_global_genres_tv)
-# Assuming your data frame has 5 variables: runtime, weekly_hours_viewed, is_staggered_launch, genre_International TV, genre_Drama, and genre_Comedy
+#slightly right-skewed, enough observed data for MICE
+ggplot(df_global_genres_tv, aes(x=runtime)) + 
+  geom_histogram(binwidth = 0.8, fill = "skyblue", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution of Runtime of Weekly Top 10 Netflix TV Shows")
 
-# Create an empty matrix of zeroes
 predictorMatrix <- matrix(0, nrow = 6, ncol = 6, dimnames = list(c("runtime", "weekly_hours_viewed", "is_staggered_launch", "genre_International", "genre_Dramas", "genre_Comedies"), c("runtime", "weekly_hours_viewed", "is_staggered_launch", "genre_International", "genre_Dramas", "genre_Comedies")))
 
 # Set up predictors for runtime
@@ -85,12 +90,87 @@ predictorMatrix["runtime", "genre_Dramas"] <- 1
 predictorMatrix["runtime", "genre_Comedies"] <- 1
 
 imputed_data <- mice(df_global_genres_tv, method = "pmm", m=6, seed=123, predictorMatrix = predictorMatrix)
-mice_mod <- mice(df_global_genres_tv, m=5, method='pmm', seed=500)
-imputed_tv <- mice(df_global_genres_tv, method='pmm', seed=500)
+completed_tv <- complete(imputed_data, 4)
+sum(completed_tv$runtime==0)
+summary(completed_tv$runtime)
 ```
-## use mean value of runtime for film and tv instead
-```{r}
 
+```{r}
+#convert genre to factor
+df_global_genres_film$genre <- apply(df_global_genres_film[, c("genre_International", "genre_Dramas", "genre_Comedies")], 1, function(x) {
+  if(x["genre_International"]) {
+    return("International")
+  } else if(x["genre_Dramas"]) {
+    return("Drama")
+  } else if(x["genre_Comedies"]) {
+    return("Comedy")
+  } else {
+    return("Other")  # for rows where none of the genres are TRUE or applicable
+  }
+})
+
+# Convert the 'genre' column to a factor
+df_global_genres_film$genre <- as.factor(df_global_genres_film$genre)
+
+predMatrix <- matrix(0, nrow = 4, ncol = 4, dimnames = list(c("runtime", "weekly_hours_viewed", "is_staggered_launch", "genre"), c("runtime", "weekly_hours_viewed", "is_staggered_launch", "genre")))
+predMatrix["runtime", "weekly_hours_viewed"] <- 1
+predMatrix["runtime", "genre"] <- 1
+predMatrix["runtime", "is_staggered_launch"] <- 1
+
+imputed_film <- mice(df_global_genres_film, method = "pmm", m=6, seed=250, predMatrix = predictorMatrix)
+completed_film <- complete(imputed_film, 1)
+sum(completed_film$runtime==0)
+summary(completed_film$runtime)
+```
+## use random sample imputation to preserve distribution for film runtime
+```{r}
+library(ggplot2)
+summary(df_global_genres_film)
+#normally distributed, close mean and median, not enough observed data
+ggplot(df_global_genres_film, aes(x=runtime)) + 
+  geom_histogram(binwidth = 0.2, fill = "skyblue", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution of Runtime of Weekly Top 10 Netflix Films")
+
+# Random sample imputation
+set.seed(123)  # for reproducibility
+df_global_genres_film$runtime[is.na(df_global_genres_film$runtime)] <- sample(df_global_genres_film$runtime[!is.na(df_global_genres_film$runtime)], sum(is.na(df_global_genres_film$runtime)), replace = TRUE)
+summary(df_global_genres_film$runtime)
+```
+
+## calculate weekly_views
+```{r}
+#drop rows with zero runtime
+
+df_global_genres_tv_filtered <- completed_tv[completed_tv$runtime>0.0000,]
+sum(df_global_genres_tv_filtered$runtime==0)
+nrow(df_global_genres_tv_filtered)
+
+completed_tv_views <- df_global_genres_tv_filtered %>%
+  mutate(weekly_views = if_else(is.na(weekly_views), weekly_hours_viewed / runtime, weekly_views))
+
+#add in season
+completed_tv_views$season <- as.integer(sub(".*(?:Season|Part) (\\d+).*", "\\1", completed_tv_views$season_title))
+completed_tv_views <- completed_tv_views %>%
+  mutate(season = if_else(is.na(season), 1, season))
+  
+#add in limited series
+completed_tv_views$is_limited_series <- FALSE
+completed_tv_views$is_limited_series[grepl("Limited Series", completed_tv_views$season_title)] <- TRUE
+
+df_film <- df_global_genres_film[df_global_genres_film$runtime>0.0000,]
+nrow(df_film)
+
+completed_film_views <- df_film %>%
+  mutate(weekly_views = if_else(is.na(weekly_views), weekly_hours_viewed / runtime, weekly_views)) 
+
+completed_film_views <- select(completed_film_views, -c(season_title))
+```
+
+## export
+```{r}
+write.csv(completed_tv_views, "global_tv.csv")
+write.csv(completed_film_views, "global_film.csv")
 ```
 
 
