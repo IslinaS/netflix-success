@@ -1,0 +1,210 @@
+---
+title: "EDA"
+output: html_document
+date: "2024-05-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load in datasets
+```{r}
+df_film <- read.csv("global_film.csv")
+df_tv <- read.csv("global_tv.csv")
+```
+
+## Response variables: film
+```{r}
+library(ggplot2)
+fr1 <- ggplot(df_film, aes(x=weekly_rank)) + 
+  geom_histogram(binwidth = 1, fill = "darkred", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution of Weekly Rank of Selected Weekly Top 10 Netflix Films", x = "Weekly Rank", y = "Frequency")
+#log bc original is heavily right skewed
+fr2_0 <- ggplot(df_film, aes(x=weekly_views)) + 
+  geom_histogram(binwidth = 100000, fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Weekly Views of Top 10 Netflix Films", x = "Number of Weekly Views", y = "Frequency")
+
+fr2 <- ggplot(df_film, aes(x=log(weekly_views))) + 
+  geom_histogram(binwidth = 0.5, fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Log-tranformed Weekly Views of Top 10 Netflix Films", x = "Number of Weekly Views", y = "Frequency")
+fr3_0 <- ggplot(df_film, aes(x=cumulative_weeks_in_top_10)) + 
+  geom_histogram(binwidth = 0.5, fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Cumulative Weeks in Top 10 of Top 10 Netflix Films", x = "Number of Weeks", y = "Frequency")
+
+#factorize weeks in top 10
+df_film$weeks_streak <- as.factor(if_else(df_film$cumulative_weeks_in_top_10 > 2, "over_two_weeks", "within_two_weeks"))
+fr3 <- ggplot(df_film, aes(x=weeks_streak)) + 
+  geom_bar(fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Cumulative Weeks in Top 10 of Top 10 Netflix Films", x = "Number of Weeks", y = "Frequency")
+fr3
+```
+## Response Variables: tv
+```{r}
+tr1 <- ggplot(df_tv, aes(x=weekly_rank)) + 
+  geom_histogram(binwidth = 1, fill = "darkred", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution of Weekly Rank of Selected Weekly Top 10 Netflix TV Shows", x = "Weekly Rank", y = "Frequency")
+tr1
+#log bc original is heavily right skewed
+tr2_0 <- ggplot(df_tv, aes(x=weekly_views)) + 
+  geom_histogram(binwidth = 1000000, fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Weekly Views of Top 10 Netflix TV Shows", x = "Number of Weekly Views", y = "Frequency")
+
+tr2 <- ggplot(df_tv, aes(x=log(weekly_views))) + 
+  geom_histogram(binwidth = 0.5, fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Log-tranformed Weekly Views of Top 10 Netflix TV Shows", x = "Number of Weekly Views", y = "Frequency")
+tr3_0 <- ggplot(df_tv, aes(x=cumulative_weeks_in_top_10)) + 
+  geom_histogram(binwidth = 0.5, fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Cumulative Weeks in Top 10 of Top 10 Netflix TV Shows", x = "Number of Weeks", y = "Frequency")
+
+df_tv$weeks_streak <- as.factor(if_else(df_tv$cumulative_weeks_in_top_10 > 2, "over_two_weeks", "within_two_weeks"))
+tr3 <- ggplot(df_tv, aes(x=weeks_streak)) + 
+  geom_bar(fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Cumulative Weeks in Top 10 of Top 10 Netflix TV Shows", x = "Number of Weeks", y = "Frequency")
+tr3
+
+```
+## predictors: film - runtime, genres, english
+
+```{r}
+fp1 <- ggplot(df_film, aes(x=runtime)) + 
+  geom_histogram(binwidth = 0.2, fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Runtime of Top 10 Netflix Films", x = "Runtime (hours)", y = "Frequency")
+fp2 <- ggplot(df_film, aes(x=genre_Dramas)) + 
+  geom_bar(fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Genre of Top 10 Netflix Films", x = "Dramas", y = "Frequency")
+fp3 <- ggplot(df_film, aes(x=genre_Comedies)) + 
+  geom_bar(fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Genre of Top 10 Netflix Films", x = "Comedies", y = "Frequency")
+fp4 <- ggplot(df_film, aes(x=genre_International)) + 
+  geom_bar(fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Genre of Top 10 Netflix Films", x = "International", y = "Frequency")
+fp5 <- ggplot(df_film, aes(x=english)) + 
+  geom_bar(fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Language of Top 10 Netflix Films", x = "English", y = "Frequency")
+
+#factorize
+df_film$genre_Comedies <- as.factor(df_film$genre_Comedies)
+df_film$genre_Dramas <- as.factor(df_film$genre_Dramas)
+df_film$genre_International <- as.factor(df_film$genre_International)
+df_film$english <- as.factor(df_film$english)
+
+df_film$weekly_views_logged <- log(df_film$weekly_views)
+
+#correlations
+pairs(df_film[c("weekly_rank", "weekly_views_logged", "weeks_streak", "runtime")])
+```
+## predictors: tv
+```{r}
+tp1 <- ggplot(df_tv, aes(x=runtime)) + 
+  geom_histogram(binwidth = 1, fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Runtime of Top 10 Netflix TV Shows", x = "Runtime (hours)", y = "Frequency")
+tp2 <- ggplot(df_tv, aes(x=genre_Dramas)) + 
+  geom_bar(fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Genre of Top 10 Netflix TV Shows", x = "Dramas", y = "Frequency")
+# almost all are not comedies
+tp3 <- ggplot(df_tv, aes(x=genre_Comedies)) + 
+  geom_bar(fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Genre of Top 10 Netflix TV Shows", x = "Comedies", y = "Frequency")
+tp4 <- ggplot(df_tv, aes(x=genre_International)) + 
+  geom_bar(fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Genre of Top 10 Netflix TV Shows", x = "International", y = "Frequency")
+tp5 <- ggplot(df_tv, aes(x=english)) + 
+  geom_bar(fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Language of Top 10 Netflix TV Shows", x = "English", y = "Frequency")
+tp6 <- ggplot(df_tv, aes(x=awards)) + 
+  geom_bar(fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Awards of Top 10 Netflix TV Shows", x = "Have won an award", y = "Frequency")
+tp7 <- ggplot(df_tv, aes(x=season)) + 
+  geom_bar(fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Seasons of Top 10 Netflix TV Shows", x = "Season number", y = "Frequency")
+tp8 <- ggplot(df_tv, aes(x=is_limited_series)) + 
+  geom_bar(fill = "darkred", color = "black") + 
+  theme_minimal() + 
+  labs(title = "Distribution of Genre of Top 10 Netflix TV Shows", x = "Is Limited Series", y = "Frequency")
+
+tp7
+
+#factorize
+df_tv$genre_Comedies <- as.factor(df_tv$genre_Comedies)
+df_tv$genre_Dramas <- as.factor(df_tv$genre_Dramas)
+df_tv$genre_International <- as.factor(df_tv$genre_International)
+df_tv$english <- as.factor(df_tv$english)
+df_tv$awards <- as.factor(df_tv$awards)
+df_tv$is_limited_series <- as.factor(df_tv$is_limited_series)
+
+breaks <- c(-Inf, 1, 3, Inf)
+df_tv$season <- cut(df_tv$season, breaks=breaks, labels=c("Season 1", "Season 2-3", "Season 4+"))
+
+df_tv$weekly_views_logged <- log(df_tv$weekly_views)
+
+# correlation
+pairs(df_tv[c("weekly_rank", "weekly_views_logged", "weeks_streak", "is_limited_series")])
+```
+
+## multivariate regression model: R2 0.25
+```{r}
+model.tv.multivar <- lm(cbind(weekly_views_logged, weekly_rank, cumulative_weeks_in_top_10) ~ runtime+genre_International+genre_Comedies+genre_Dramas+english+season+is_limited_series+awards, data=df_tv)
+summary(model.tv.multivar)
+
+model.film.multivar <- lm(cbind(weekly_views_logged) ~ runtime+genre_International+genre_Comedies+genre_Dramas+english, data=df_film)
+summary(model.film.multivar)
+```
+## multivariate adaptive regression splines (MARS): very small improvement from multivar
+```{r}
+library(earth)
+model.tv.1 <- earth(weekly_views_logged ~ runtime+genre_International+genre_Comedies+genre_Dramas+english+season+is_limited_series+awards, data = df_tv)
+summary(model.tv.1)
+model.tv.2 <- earth(weekly_rank ~ runtime+genre_International+genre_Comedies+genre_Dramas+english+season+is_limited_series+awards, data = df_tv)
+summary(model.tv.2)
+model.tv.3 <- earth(cumulative_weeks_in_top_10 ~ runtime+genre_International+genre_Comedies+genre_Dramas+english+season+is_limited_series+awards, data = df_tv)
+summary(model.tv.3)
+
+model.film.1 <- earth(weekly_views_logged ~ runtime+genre_International+genre_Comedies+genre_Dramas+english, data = df_film)
+summary(model.film.1)
+model.film.2 <- earth(cumulative_weeks_in_top_10 ~ runtime+genre_International+genre_Comedies+genre_Dramas+english, data = df_film)
+summary(model.film.2)
+```
+
+## combine film and tv, mixed effects model
+```{r}
+library(lme4)
+library(lmerTest)
+library(MuMIn)
+df_tv$tv <- TRUE
+df_tv_merge <- select(df_tv, -c(season_title, season, is_limited_series))
+df_film$tv <- FALSE
+df_combined <- rbind(df_tv_merge, df_film)
+
+model.lm <- lm(weekly_views_logged ~ runtime+genre_International+genre_Comedies+genre_Dramas+english+awards, data=df_combined)
+
+summary(model.lm)
+
+m1 <- lmer(weekly_views_logged ~ 1+runtime+genre_International+genre_Dramas+english+awards+tv+(1 | genre_Comedies), data = df_combined)
+summary(m1)
+r.sq <- r.squaredGLMM(m1)
+print(r.sq)
+```
+
