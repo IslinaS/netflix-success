@@ -13,6 +13,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library("readxl")
 views_global <- read_excel("../all-weeks-global.xlsx")
 head(views_global)
+sum(grepl("Film", views_global$category))
+sum(grepl("TV", views_global$category))
 views_us <- read.csv("../all-weeks-us.csv")
 head(views_us)
 netflix <- read.csv("../netflix.csv")
@@ -88,6 +90,20 @@ predictorMatrix["runtime", "is_staggered_launch"] <- 1
 predictorMatrix["runtime", "genre_International"] <- 1
 predictorMatrix["runtime", "genre_Dramas"] <- 1
 predictorMatrix["runtime", "genre_Comedies"] <- 1
+
+#adjust pred matrix to match main analysis model
+df_global_genres_tv$season <- as.integer(sub(".*(?:Season|Part) (\\d+).*", "\\1", df_global_genres_tv$season_title))
+df_global_genres_tv <- df_global_genres_tv %>%
+  mutate(season = if_else(is.na(season), 1, season))
+
+df_global_genres_tv$weekly_views_logged <- log(df_global_genres_tv$weekly_hours_viewed)
+predMatrix2 <- matrix(0, nrow = 7, ncol = 7, dimnames = list(c("runtime", "weekly_views_logged","genre_Comedies", "genre_Drama", "season", "english", "awards"), c("runtime", "weekly_views_logged","genre_Comedies", "genre_Drama", "season", "english", "awards")))
+predMatrix2["runtime", "genre_Comedies"] <- 1
+predMatrix2["runtime", "genre_Drama"] <- 1
+predMatrix2["runtime", "season"] <- 1
+predMatrix2["runtime", "english"] <- 1
+predMatrix2["runtime", "awards"] <- 1
+predMatrix2["runtime", "weekly_views_logged"] <- 1
 
 imputed_data <- mice(df_global_genres_tv, method = "pmm", m=6, seed=123, predictorMatrix = predictorMatrix)
 completed_tv <- complete(imputed_data, 4)

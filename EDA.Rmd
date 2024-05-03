@@ -164,12 +164,19 @@ df_tv$weekly_views_logged <- log(df_tv$weekly_views)
 pairs(df_tv[c("weekly_rank", "weekly_views_logged", "weeks_streak", "is_limited_series")])
 ```
 
+## check week distribution
+```{r}
+ggplot(df_tv, aes(x=week)) +
+  geom_bar(fill = "darkred", color = "black") + 
+  theme_minimal()
+```
+
 ## multivariate regression model: R2 0.25
 ```{r}
-model.tv.multivar <- lm(cbind(weekly_views_logged, weekly_rank, cumulative_weeks_in_top_10) ~ runtime+genre_International+genre_Comedies+genre_Dramas+english+season+is_limited_series+awards, data=df_tv)
+model.tv.multivar <- lm(cbind(weekly_views_logged, cumulative_weeks_in_top_10) ~ runtime+genre_International+genre_Comedies+genre_Dramas+english+season+is_limited_series+awards, data=df_tv)
 summary(model.tv.multivar)
 
-model.film.multivar <- lm(cbind(weekly_views_logged) ~ runtime+genre_International+genre_Comedies+genre_Dramas+english, data=df_film)
+model.film.multivar <- lm(cbind(weekly_views_logged, cumulative_weeks_in_top_10) ~ runtime+genre_International+genre_Comedies+genre_Dramas+english, data=df_film)
 summary(model.film.multivar)
 ```
 ## multivariate adaptive regression splines (MARS): very small improvement from multivar
@@ -202,9 +209,66 @@ model.lm <- lm(weekly_views_logged ~ runtime+genre_International+genre_Comedies+
 
 summary(model.lm)
 
-m1 <- lmer(weekly_views_logged ~ 1+runtime+genre_International+genre_Dramas+english+awards+tv+(1 | genre_Comedies), data = df_combined)
-summary(m1)
-r.sq <- r.squaredGLMM(m1)
+m1.1 <- lmer(cumulative_weeks_in_top_10 ~ runtime+genre_International+genre_Comedies+genre_Dramas+english+tv+(1 | awards), data = df_combined)
+summary(m1.1)
+r.sq <- r.squaredGLMM(m1.1)
 print(r.sq)
+
+m1.2 <- lmer(weekly_views_logged ~ runtime+genre_International+genre_Comedies+genre_Dramas+english+tv+(1 | awards), data = df_combined)
+summary(m1.2)
+r.sq <- r.squaredGLMM(m1.2)
+print(r.sq)
+
+#R2c = 0.52
+m2.lm <- lm(weekly_views_logged ~ runtime+genre_International+genre_Comedies+genre_Dramas+english+is_limited_series+season+awards, data = df_tv)
+summary(m2.lm)
+
+m2 <- lmer(weekly_views_logged ~ runtime+genre_International+(1|genre_Comedies)+genre_Dramas+english+is_limited_series+season+(1|awards), data = df_tv)
+summary(m2)
+r.sq <- r.squaredGLMM(m2)
+r.sq
+
+
+m2.sign <- lmer(weekly_views_logged ~ runtime+(1|genre_Comedies)+genre_Dramas+english+season+(1|awards), data = df_tv)
+summary(m2.sign)
+r.sq <- r.squaredGLMM(m2.sign)
+r.sq
+
+#diagnostic plots: good
+plot(residuals(m2.sign) ~ fitted.values(m2.sign), main="Residual Plot", ylab="Residuals", xlab="Fitted values") +
+  abline(h=0, col="red") 
+
+plot(qqnorm(residuals(m2.sign))) + 
+  qqline(residuals(m2.sign), col="red")
+
+
+#sensitivity analysis: R2m more similar to R2c, but R2 less than 0.52
+m2.all <- lmer(weekly_views_logged ~ runtime+genre_International+(1|genre_Comedies)+genre_Dramas+english+(1|awards), data = df_combined)
+summary(m2.all)
+r.sq <- r.squaredGLMM(m2.all)
+r.sq
+
+m2.2 <- lmer(cumulative_weeks_in_top_10 ~ runtime+genre_International+genre_Comedies+genre_Dramas+english+is_limited_series+season+(1 | awards), data = df_tv)
+summary(m2.2)
+r.sq <- r.squaredGLMM(m2.2)
+r.sq
+
+#R2c = 0.563
+m3 <- lmer(weekly_views_logged ~ runtime+genre_International+genre_Comedies+genre_Dramas+(1|english), data = df_film)
+summary(m3)
+r.sq <- r.squaredGLMM(m3)
+r.sq
+
+m3.2 <- lmer(cumulative_weeks_in_top_10 ~ runtime+genre_International+genre_Comedies+genre_Dramas+(1|english), data = df_film)
+summary(m3.2)
+r.sq <- r.squaredGLMM(m3.2)
+r.sq
+```
+
+## correlations
+```{r}
+ggplot(df_tv, aes(x = weekly_views_logged, y = weekly_rank)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = TRUE)
 ```
 
